@@ -1,0 +1,202 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ministry Admin Dashboard</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f5f4;color:#24332c}
+header{background:#174c3a;color:white;padding:22px}
+header h2{margin:0}
+header p{margin:7px 0 0;color:#d5e9df}
+nav{display:flex;gap:8px;padding:14px;overflow-x:auto;background:white}
+button{border:0;padding:11px 16px;border-radius:8px;cursor:pointer;background:#e5eee9;color:#174c3a}
+button.active,button.primary{background:#176448;color:white}
+main{padding:20px;max-width:1100px;margin:auto}
+.panel{display:none}
+.panel.active{display:block}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+.card,.section{background:white;padding:18px;border-radius:12px;margin-bottom:15px}
+.card strong{font-size:27px;display:block;margin-top:10px}
+input,textarea,select{width:100%;padding:12px;margin:7px 0 14px;border:1px solid #ccd8d1;border-radius:7px;font:inherit}
+textarea{min-height:85px}
+form{max-width:650px}
+.item{padding:12px;border-bottom:1px solid #e5eae7}
+.item small{color:#66766d}
+h3{margin-top:0}
+</style>
+</head>
+<body>
+<header>
+<h2>🙏 Ministry Admin Dashboard</h2>
+<p>Faith • Prayer • Fellowship • Service</p>
+</header>
+
+<nav>
+<button class="active" onclick="show('home',this)">Dashboard</button>
+<button onclick="show('members',this)">Members</button>
+<button onclick="show('devotion',this)">Devotion</button>
+<button onclick="show('prayer',this)">Prayer</button>
+<button onclick="show('attendance',this)">Attendance</button>
+<button onclick="show('quiz',this)">Bible Quiz</button>
+<button onclick="show('news',this)">Announcements</button>
+</nav>
+
+<main>
+<section id="home" class="panel active">
+<h2>Welcome, Ministry Admin!</h2>
+<div class="cards">
+<div class="card">Members<strong id="memberCount">0</strong></div>
+<div class="card">Prayer Requests<strong id="prayerCount">0</strong></div>
+<div class="card">Meetings<strong id="meetingCount">0</strong></div>
+<div class="card">Announcements<strong id="newsCount">0</strong></div>
+</div>
+<div class="section">
+<h3>Ministry Mission</h3>
+<p>Growing in Christ and sharing His love every day.</p>
+<p>Use the menu above to manage ministry activities.</p>
+</div>
+</section>
+
+<section id="members" class="panel">
+<h2>Member Management</h2>
+<form id="memberForm">
+<label>Member Name</label>
+<input id="memberName" required>
+<label>Phone Number (optional)</label>
+<input id="memberPhone">
+<button class="primary">Add Member</button>
+</form>
+<div class="section"><h3>Members List</h3><div id="memberList"></div></div>
+</section>
+
+<section id="devotion" class="panel">
+<h2>Daily Devotion</h2>
+<form id="devotionForm">
+<label>Date</label><input type="date" id="devDate" required>
+<label>Bible Verse</label><input id="devVerse" placeholder="John 3:16" required>
+<label>Telugu Devotion</label><textarea id="devTelugu"></textarea>
+<label>English Devotion</label><textarea id="devEnglish"></textarea>
+<label>Prayer</label><textarea id="devPrayer"></textarea>
+<button class="primary">Save Devotion</button>
+</form>
+<div class="section"><h3>Saved Devotions</h3><div id="devotionList"></div></div>
+</section>
+
+<section id="prayer" class="panel">
+<h2>Prayer Requests 🙏</h2>
+<form id="prayerForm">
+<label>Member Name</label><input id="prayerName" required>
+<label>Prayer Request</label><textarea id="prayerText" required></textarea>
+<label>Privacy</label>
+<select id="prayerPrivacy">
+<option>Prayer Team Only</option>
+<option>Share with Group (with permission)</option>
+</select>
+<button class="primary">Save Prayer Request</button>
+</form>
+<div class="section"><h3>Prayer List</h3><div id="prayerList"></div></div>
+</section>
+
+<section id="attendance" class="panel">
+<h2>Meeting Attendance</h2>
+<form id="attendanceForm">
+<label>Meeting Name</label><input id="meetingName" required>
+<label>Meeting Date</label><input type="date" id="meetingDate" required>
+<label>Member Name</label><input id="attendanceName" required>
+<label>Status</label>
+<select id="attendanceStatus">
+<option>Present</option><option>Absent</option><option>Unable to Attend</option>
+</select>
+<button class="primary">Record Attendance</button>
+</form>
+<div class="section"><h3>Attendance Records</h3><div id="attendanceList"></div></div>
+</section>
+
+<section id="quiz" class="panel">
+<h2>Bible Quiz</h2>
+<form id="quizForm">
+<label>Question</label><textarea id="question" required></textarea>
+<label>Correct Answer</label><input id="answer" required>
+<label>Bible Reference</label><input id="reference" placeholder="Genesis 1:1">
+<button class="primary">Save Question</button>
+</form>
+<div class="section"><h3>Quiz Questions</h3><div id="quizList"></div></div>
+</section>
+
+<section id="news" class="panel">
+<h2>Ministry Announcements 📢</h2>
+<form id="newsForm">
+<label>Announcement Title</label><input id="newsTitle" required>
+<label>Message</label><textarea id="newsMessage" required></textarea>
+<button class="primary">Publish Announcement</button>
+</form>
+<div class="section"><h3>Announcements</h3><div id="newsList"></div></div>
+</section>
+</main>
+
+<script>
+const keys=['members','devotions','prayers','attendance','quizzes','news'];
+const db={};
+keys.forEach(k=>{
+  try{db[k]=JSON.parse(localStorage.getItem('ministry_'+k)||'[]')}
+  catch{db[k]=[]}
+});
+function save(k){
+  localStorage.setItem('ministry_'+k,JSON.stringify(db[k]));
+  render();
+}
+function show(id,btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+function addForm(id,fields,key){
+  document.getElementById(id).addEventListener('submit',e=>{
+    e.preventDefault();
+    const data={};
+    fields.forEach(f=>{
+      data[f]=document.getElementById(f).value.trim();
+    });
+    data.created=new Date().toLocaleString();
+    db[key].unshift(data);
+    save(key);
+    e.target.reset();
+  });
+}
+addForm('memberForm',['memberName','memberPhone'],'members');
+addForm('devotionForm',['devDate','devVerse','devTelugu','devEnglish','devPrayer'],'devotions');
+addForm('prayerForm',['prayerName','prayerText','prayerPrivacy'],'prayers');
+addForm('attendanceForm',['meetingName','meetingDate','attendanceName','attendanceStatus'],'attendance');
+addForm('quizForm',['question','answer','reference'],'quizzes');
+addForm('newsForm',['newsTitle','newsMessage'],'news');
+
+function safe(s){
+  const d=document.createElement('div');
+  d.textContent=s||'';
+  return d.innerHTML;
+}
+function list(id,items,fields){
+  document.getElementById(id).innerHTML=items.length?
+    items.map(x=>'<div class="item">'+fields.map(f=>'<div>'+safe(x[f])+'</div>').join('')+'<small>'+safe(x.created)+'</small></div>').join('')
+    :'<p>No records yet.</p>';
+}
+function render(){
+  document.getElementById('memberCount').textContent=db.members.length;
+  document.getElementById('prayerCount').textContent=db.prayers.length;
+  document.getElementById('meetingCount').textContent=db.attendance.length;
+  document.getElementById('newsCount').textContent=db.news.length;
+  list('memberList',db.members,['memberName','memberPhone']);
+  list('devotionList',db.devotions,['devDate','devVerse','devTelugu','devEnglish','devPrayer']);
+  list('prayerList',db.prayers,['prayerName','prayerText','prayerPrivacy']);
+  list('attendanceList',db.attendance,['meetingName','meetingDate','attendanceName','attendanceStatus']);
+  list('quizList',db.quizzes,['question','answer','reference']);
+  list('newsList',db.news,['newsTitle','newsMessage']);
+}
+render();
+</script>
+</body>
+</html>
