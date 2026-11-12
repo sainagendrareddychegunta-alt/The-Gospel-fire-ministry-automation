@@ -1,0 +1,137 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>THE GOSPEL FIRE | Ministry</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f5f7f5;color:#20352b}
+header{background:linear-gradient(135deg,#123d30,#176448);color:white;padding:38px 20px;text-align:center}
+header h1{font-size:32px;margin:0}
+header p{color:#d8eee3}
+main{max-width:900px;margin:auto;padding:20px}
+section{background:white;padding:22px;border-radius:14px;margin:18px 0;box-shadow:0 3px 14px #0000000c}
+h2{color:#176448}
+.verse{font-size:21px;line-height:1.7}
+.english{color:#58685f;line-height:1.6}
+.date{color:#78877f;font-size:13px}
+.item{border-bottom:1px solid #e5eae7;padding:14px 0}
+footer{text-align:center;padding:25px;background:#123d30;color:white}
+#status{color:#68786f}
+</style>
+</head>
+<body>
+
+<header>
+<h1>🔥 THE GOSPEL FIRE</h1>
+<p>Sharing the Love of Jesus • Faith • Prayer • Service</p>
+</header>
+
+<main>
+<section>
+<h2>🙏 Today's Bible Verse</h2>
+<div id="devotion">
+<p id="status">Loading today's Bible verse...</p>
+</div>
+</section>
+
+<section>
+<h2>📢 Ministry Announcements</h2>
+<div id="announcements">Loading announcements...</div>
+</section>
+</main>
+
+<footer>
+<p>THE GOSPEL FIRE MINISTRY</p>
+<p>Jesus Christ is the same yesterday and today and forever. — Hebrews 13:8</p>
+</footer>
+
+<script>
+const SUPABASE_URL = "https://thngutiopftiuamewlul.supabase.co";
+const SUPABASE_KEY = "sb_publishable__ibRVpxs45L_jqXRSXzayg_YEpLUjlR";
+
+const client = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+function addText(parent,tag,value,className){
+  const el=document.createElement(tag);
+  el.textContent=value||"";
+  if(className) el.className=className;
+  parent.appendChild(el);
+  return el;
+}
+
+async function loadDevotion(){
+  const box=document.getElementById("devotion");
+  const today=new Date().toLocaleDateString("en-CA");
+
+  const {data,error}=await client
+    .from("devotions")
+    .select("devotion_date,verse,telugu,english,prayer")
+    .lte("devotion_date",today)
+    .order("devotion_date",{ascending:false})
+    .limit(1);
+
+  box.replaceChildren();
+
+  if(error){
+    addText(box,"p","Unable to load Bible verse. Please try again.");
+    return;
+  }
+
+  if(!data || !data.length){
+    addText(box,"p","Today's Bible verse will be updated soon.");
+    return;
+  }
+
+  const d=data[0];
+  addText(box,"p",d.devotion_date,"date");
+  addText(box,"h3",d.verse);
+  addText(box,"p",d.telugu,"verse");
+  addText(box,"p",d.english,"english");
+
+  if(d.prayer){
+    addText(box,"h3","Prayer");
+    addText(box,"p",d.prayer,"english");
+  }
+}
+
+async function loadAnnouncements(){
+  const box=document.getElementById("announcements");
+  const {data,error}=await client
+    .from("announcements")
+    .select("title,message,created_at")
+    .order("created_at",{ascending:false})
+    .limit(20);
+
+  box.replaceChildren();
+
+  if(error){
+    addText(box,"p","Unable to load announcements.");
+    return;
+  }
+
+  if(!data || !data.length){
+    addText(box,"p","No announcements yet.");
+    return;
+  }
+
+  data.forEach(item=>{
+    const article=document.createElement("article");
+    article.className="item";
+    addText(article,"h3",item.title);
+    addText(article,"p",item.message);
+    box.appendChild(article);
+  });
+}
+
+loadDevotion();
+loadAnnouncements();
+</script>
+</body>
+</html>
