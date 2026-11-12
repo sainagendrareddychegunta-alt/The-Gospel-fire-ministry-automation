@@ -103,6 +103,17 @@ style="width:100%;padding:12px;border:1px solid #d5dfd9;border-radius:8px;margin
 <label for="prayerText">How can we pray for you?</label>
 <textarea id="prayerText" name="request" maxlength="3000" rows="5" required
 style="width:100%;padding:12px;border:1px solid #d5dfd9;border-radius:8px;margin:8px 0 14px;resize:vertical"></textarea>
+<div class="voice-box" style="background:#f4f8f4;border:1px solid #d8e5dc;border-radius:12px;padding:14px;margin:8px 0 16px">
+<strong style="display:block;color:#14543f;margin-bottom:6px">🎙️ Voice Prayer Request (Optional)</strong>
+<p class="english" style="margin:4px 0 12px">You can record your prayer instead of typing. Tap Start Recording, speak, then Stop and listen before sending.</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<button type="button" id="startVoice" style="background:#14543f;color:white;border:0;border-radius:8px;padding:11px 14px;cursor:pointer;font-weight:bold">🎙️ Start Recording</button>
+<button type="button" id="stopVoice" disabled style="background:#9aa9a0;color:white;border:0;border-radius:8px;padding:11px 14px;cursor:pointer;font-weight:bold">■ Stop Recording</button>
+<button type="button" id="deleteVoice" disabled style="background:#fff;color:#8b302b;border:1px solid #d9b8b5;border-radius:8px;padding:11px 14px;cursor:pointer">Delete Recording</button>
+</div>
+<p id="voiceStatus" class="english" role="status" aria-live="polite">No voice recording yet.</p>
+<audio id="voicePreview" controls style="display:none;width:100%;margin-top:8px"></audio>
+</div>
 <label for="prayerPrivacy">Privacy preference</label>
 <select id="prayerPrivacy" name="privacy" required
 style="width:100%;padding:12px;border:1px solid #d5dfd9;border-radius:8px;margin:8px 0 14px;background:white">
@@ -296,56 +307,137 @@ async function loadMedia(){
 }
 
 
+let voiceRecorder=null;
+let voiceStream=null;
+let voiceChunks=[];
+let voiceBlob=null;
+let voiceMimeType="";
+let voiceTimer=null;
+let voiceSeconds=0;
+
+function updateVoiceStatus(message){
+  document.getElementById("voiceStatus").textContent=message;
+}
+
+function stopVoiceTracks(){
+  if(voiceStream){voiceStream.getTracks().forEach(track=>track.stop());voiceStream=null;}
+}
+
+async function startVoiceRecording(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder){
+    updateVoiceStatus("Voice recording is not supported in this browser. Please type your prayer request instead.");
+    return;
+  }
+  try{
+    voiceStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    voiceChunks=[];
+    voiceBlob=null;
+    voiceMimeType=(MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":(MediaRecorder.isTypeSupported("audio/mp4")?"audio/mp4":""));
+    voiceRecorder=voiceMimeType?new MediaRecorder(voiceStream,{mimeType:voiceMimeType}):new MediaRecorder(voiceStream);
+    voiceMimeType=voiceRecorder.mimeType||voiceMimeType||"audio/webm";
+    voiceRecorder.ondataavailable=e=>{if(e.data && e.data.size)voiceChunks.push(e.data);};
+    voiceRecorder.onstop=()=>{
+      voiceBlob=new Blob(voiceChunks,{type:voiceMimeType});
+      const preview=document.getElementById("voicePreview");
+      preview.src=URL.createObjectURL(voiceBlob);
+      preview.style.display="block";
+      document.getElementById("deleteVoice").disabled=false;
+      updateVoiceStatus("Recording ready. Please listen to it before sending. ("+Math.round(voiceBlob.size/1024)+" KB)");
+      stopVoiceTracks();
+    };
+    voiceRecorder.start();
+    voiceSeconds=0;
+    document.getElementById("startVoice").disabled=true;
+    document.getElementById("stopVoice").disabled=false;
+    document.getElementById("deleteVoice").disabled=true;
+    document.getElementById("voicePreview").style.display="none";
+    updateVoiceStatus("Recording... 0:00. Maximum 3 minutes.");
+    voiceTimer=setInterval(()=>{
+      voiceSeconds++;
+      updateVoiceStatus("Recording... "+Math.floor(voiceSeconds/60)+":"+String(voiceSeconds%60).padStart(2,"0")+". Maximum 3 minutes.");
+      if(voiceSeconds>=180)stopVoiceRecording();
+    },1000);
+  }catch(error){
+    stopVoiceTracks();
+    updateVoiceStatus("Microphone access was not granted. Please allow microphone access or type your prayer request.");
+    console.error("Microphone error:",error);
+  }
+}
+
+function stopVoiceRecording(){
+  if(voiceTimer){clearInterval(voiceTimer);voiceTimer=null;}
+  if(voiceRecorder && voiceRecorder.state!=="inactive")voiceRecorder.stop();
+  document.getElementById("startVoice").disabled=false;
+  document.getElementById("stopVoice").disabled=true;
+}
+
+function deleteVoiceRecording(){
+  voiceBlob=null;voiceChunks=[];
+  const preview=document.getElementById("voicePreview");
+  if(preview.src)URL.revokeObjectURL(preview.src);
+  preview.removeAttribute("src");preview.load();preview.style.display="none";
+  document.getElementById("deleteVoice").disabled=true;
+  updateVoiceStatus("Recording deleted. You can record again or type your request.");
+}
+
+document.getElementById("startVoice").addEventListener("click",startVoiceRecording);
+document.getElementById("stopVoice").addEventListener("click",stopVoiceRecording);
+document.getElementById("deleteVoice").addEventListener("click",deleteVoiceRecording);
+
 async function submitPrayerRequest(event){
   event.preventDefault();
-
+  if(voiceRecorder && voiceRecorder.state==="recording"){
+    updateVoiceStatus("Please stop the recording before sending.");
+    return;
+  }
   const form=document.getElementById("prayerRequestForm");
   const status=document.getElementById("prayerFormStatus");
   const button=document.getElementById("prayerSubmit");
   const honeypot=document.getElementById("website");
-
   if(honeypot.value.trim()){
     status.textContent="Thank you. Your request has been received.";
-    form.reset();
-    return;
+    form.reset();return;
   }
-
   const member_name=document.getElementById("prayerName").value.trim();
-  const request=document.getElementById("prayerText").value.trim();
+  const typedRequest=document.getElementById("prayerText").value.trim();
   const privacy=document.getElementById("prayerPrivacy").value;
-
-  if(!member_name || request.length<5){
-    status.textContent="Please enter your name and a prayer request of at least 5 characters.";
-    return;
+  if(!member_name || (!typedRequest && !voiceBlob)){
+    status.textContent="Please enter your name and either type a prayer or record your voice.";return;
   }
-
-  if(member_name.length>100 || request.length>3000){
-    status.textContent="Please shorten your name or prayer request and try again.";
-    return;
+  if(member_name.length>100 || typedRequest.length>3000){
+    status.textContent="Please shorten your name or prayer request and try again.";return;
   }
-
-  button.disabled=true;
-  button.textContent="Sending...";
+  if(voiceBlob && voiceBlob.size>15*1024*1024){
+    status.textContent="Your recording is too large. Please make a shorter recording (maximum 15 MB).";return;
+  }
+  button.disabled=true;button.textContent="Sending...";
   status.textContent="Sending your prayer request...";
-
-  const {error}=await client.from("prayer_requests").insert({
-    member_name:member_name,
-    request:request,
-    privacy:privacy,
-    status:"New"
-  });
-
-  button.disabled=false;
-  button.textContent="Send Prayer Request";
-
-  if(error){
+  let audioPath=null;
+  try{
+    if(voiceBlob){
+      const ext=voiceMimeType.includes("mp4")?"m4a":(voiceMimeType.includes("ogg")?"ogg":"webm");
+      audioPath="requests/"+crypto.randomUUID()+"."+ext;
+      const {error:uploadError}=await client.storage.from("prayer-audio").upload(audioPath,voiceBlob,{
+        contentType:voiceMimeType.split(";")[0]||"audio/webm",upsert:false
+      });
+      if(uploadError)throw uploadError;
+    }
+    const request=typedRequest || "Voice prayer request (audio recording attached).";
+    const {error}=await client.from("prayer_requests").insert({
+      member_name:member_name,request:request,privacy:privacy,status:"New",audio_path:audioPath
+    });
+    if(error){
+      if(audioPath)await client.storage.from("prayer-audio").remove([audioPath]);
+      throw error;
+    }
+    form.reset();deleteVoiceRecording();
+    status.textContent="🙏 Thank you. Your prayer request has been sent to our ministry prayer team.";
+  }catch(error){
     console.error("Prayer request submission error:",error);
     status.textContent="Sorry, we could not send your request. Please try again later.";
-    return;
+  }finally{
+    button.disabled=false;button.textContent="Send Prayer Request";
   }
-
-  form.reset();
-  status.textContent="🙏 Thank you. Your prayer request has been sent to our ministry prayer team.";
 }
 
 document.getElementById("prayerRequestForm")
