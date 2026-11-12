@@ -49,6 +49,36 @@ footer{text-align:center;padding:25px;background:#123d30;color:white}
 <div id="announcements">Loading announcements...</div>
 </section>
 
+
+<section>
+<h2>🙏 Submit a Prayer Request</h2>
+<p class="english">We would be honoured to pray with you. Your request will be received by the ministry prayer team.</p>
+<form id="prayerRequestForm">
+<label for="prayerName">Your name</label>
+<input id="prayerName" name="member_name" type="text" maxlength="100" autocomplete="name" required
+style="width:100%;padding:12px;border:1px solid #d5dfd9;border-radius:8px;margin:8px 0 14px">
+<label for="prayerText">How can we pray for you?</label>
+<textarea id="prayerText" name="request" maxlength="3000" rows="5" required
+style="width:100%;padding:12px;border:1px solid #d5dfd9;border-radius:8px;margin:8px 0 14px;resize:vertical"></textarea>
+<label for="prayerPrivacy">Privacy preference</label>
+<select id="prayerPrivacy" name="privacy" required
+style="width:100%;padding:12px;border:1px solid #d5dfd9;border-radius:8px;margin:8px 0 14px;background:white">
+<option value="Prayer Team Only">Prayer Team Only</option>
+<option value="Share with Group (with permission)">Share with Group (with permission)</option>
+</select>
+<div aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden">
+<label for="website">Leave this field empty</label>
+<input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
+</div>
+<button type="submit" id="prayerSubmit"
+style="background:#176448;color:white;border:0;padding:13px 20px;border-radius:8px;cursor:pointer;font-weight:bold">
+Send Prayer Request
+</button>
+<p id="prayerFormStatus" role="status" aria-live="polite" class="english"></p>
+<p class="date">Please do not include passwords, financial details, or other highly sensitive personal information.</p>
+</form>
+</section>
+
 <section>
 <h2>📸 Ministry Photo & Video Gallery</h2>
 <p class="english">Photos and videos from THE GOSPEL FIRE MINISTRY.</p>
@@ -201,6 +231,63 @@ async function loadMedia(){
     box.appendChild(card);
   });
 }
+
+
+async function submitPrayerRequest(event){
+  event.preventDefault();
+
+  const form=document.getElementById("prayerRequestForm");
+  const status=document.getElementById("prayerFormStatus");
+  const button=document.getElementById("prayerSubmit");
+  const honeypot=document.getElementById("website");
+
+  if(honeypot.value.trim()){
+    status.textContent="Thank you. Your request has been received.";
+    form.reset();
+    return;
+  }
+
+  const member_name=document.getElementById("prayerName").value.trim();
+  const request=document.getElementById("prayerText").value.trim();
+  const privacy=document.getElementById("prayerPrivacy").value;
+
+  if(!member_name || request.length<5){
+    status.textContent="Please enter your name and a prayer request of at least 5 characters.";
+    return;
+  }
+
+  if(member_name.length>100 || request.length>3000){
+    status.textContent="Please shorten your name or prayer request and try again.";
+    return;
+  }
+
+  button.disabled=true;
+  button.textContent="Sending...";
+  status.textContent="Sending your prayer request...";
+
+  const {error}=await client.from("prayer_requests").insert({
+    member_name:member_name,
+    request:request,
+    privacy:privacy,
+    status:"New"
+  });
+
+  button.disabled=false;
+  button.textContent="Send Prayer Request";
+
+  if(error){
+    console.error("Prayer request submission error:",error);
+    status.textContent="Sorry, we could not send your request. Please try again later.";
+    return;
+  }
+
+  form.reset();
+  status.textContent="🙏 Thank you. Your prayer request has been sent to our ministry prayer team.";
+}
+
+document.getElementById("prayerRequestForm")
+  .addEventListener("submit",submitPrayerRequest);
+
 
 loadDevotion();
 loadAnnouncements();
